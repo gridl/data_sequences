@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = data_sequences
+omit = site-packages, .env
+
+[html]
+directory = htmlcov
