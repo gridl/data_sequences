@@ -4,6 +4,10 @@ import pytest
 from data_sequences import base_classes
 
 
+def test_invalid_usage_error():
+    assert issubclass(base_classes.InvalidUsageError, Exception)
+
+
 def test_dataset_num_examples():
     dataset = base_classes.DataSet()
     with pytest.raises(NotImplementedError):
@@ -20,10 +24,21 @@ def test_dataset_shuffle_N_arrays():
     dataset = base_classes.DataSet()
     test_arrays_1 = [np.arange(10)]
     shuffled_1 = dataset._shuffle_N_arrays(test_arrays_1)
-    assert not all(np.all(a1 == a2) for a1, a2 in zip(test_arrays_1, shuffled_1))
-    test_arrays_2 = [np.arange(10), np.arange(20)]
+    assert not all(
+        np.all(a1 == a2) for a1, a2 in zip(test_arrays_1, shuffled_1))
+    test_arrays_2 = [np.arange(10), np.arange(10, 20)]
     shuffled_2 = dataset._shuffle_N_arrays(test_arrays_2)
-    assert not all(np.all(a1 == a2) for a1, a2 in zip(test_arrays_2, shuffled_2))
+    assert not all(
+        np.all(a1 == a2) for a1, a2 in zip(test_arrays_2, shuffled_2))
+    assert all(shuffled_2[0] + 10 == shuffled_2[1])
+    test_arrays_various_length = [np.arange(10), np.arange(20)]
+    with pytest.raises(base_classes.InvalidUsageError):
+        dataset._shuffle_N_arrays(test_arrays_various_length)
+    test_arrays_with_list = [np.arange(10), list(range(20, 30))]
+    shuffled_3 = dataset._shuffle_N_arrays(test_arrays_with_list)
+    assert all(shuffled_3[0] + 20 == shuffled_3[1])
+    assert not all(
+        np.all(a1 == a2) for a1, a2 in zip(test_arrays_with_list, shuffled_3))
 
 
 def test_data_provider_from_to_one_hot():

@@ -3,6 +3,10 @@ from __future__ import print_function, division
 import numpy as np
 
 
+class InvalidUsageError(Exception):
+    pass
+
+
 class DataSet:
     """Class to represent some dataset: train, validation, test, etc."""
     @property
@@ -22,10 +26,21 @@ class DataSet:
         Return:
             shuffled_arrays: list of numpy arrays
         """
+        shapes = [np.asarray(ar).shape[0] for ar in arrays]
+        if len(set(shapes)) != 1:
+            msg = ("Shapes of arrays first dimension or list length should be "
+                   "equal.")
+            raise InvalidUsageError(msg)
         rand_indexes = np.random.permutation(arrays[0].shape[0])
         shuffled_arrays = []
         for array in arrays:
-            shuffled_arrays.append(array[rand_indexes])
+            if isinstance(array, np.ndarray):
+                shuffled_arrays.append(array[rand_indexes])
+            else:
+                res = []
+                for ind in rand_indexes:
+                    res.append(array[ind])
+                shuffled_arrays.append(res)
         return shuffled_arrays
 
 
