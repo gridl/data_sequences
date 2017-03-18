@@ -6,14 +6,18 @@ import tempfile
 import numpy as np
 from six.moves import cPickle
 
-from .base_classes import DataSet, DataProvider, InvalidUsageError
-from .utils import makedirs
+from .base_classes import DataSet, DataProvider
+from .utils import makedirs, nd_array_to_one_hot
 
 
 class BaseNumbersDataSet(DataSet):
-    def random_data(self, size):
+    def random_data(self, size, one_hot=False):
         """Return arrays of random inputs, concatenated input and targets
         of requires size.
+        Args:
+            size: `int`, first dimension of generated data
+            one_hot: `bool`, default=False,
+                return inputs and labels one hot encoder or not
         Returns:
             inputs_1: 2D numpy array, shape (size, max_inputs_length)
             inputs_2: 2D numpy array, shape (size, max_inputs_length)
@@ -21,13 +25,14 @@ class BaseNumbersDataSet(DataSet):
                 shape (size, max_inputs_length * 2 + 1)
             targets: 2D numpy array, shape (size, max_inputs_length + 1)
         """
+        n_classes = 10
         inputs_1 = np.zeros((size, self.max_inputs_length), dtype='uint8')
         inputs_2 = np.zeros((size, self.max_inputs_length), dtype='uint8')
         inputs_concat = []
         targets = np.zeros((size, self.max_inputs_length + 1), dtype='uint8')
         for i in range(size):
-            inp_1 = random.randint(1, self.max_inputs_length * 10)
-            inp_2 = random.randint(1, self.max_inputs_length * 10)
+            inp_1 = random.randint(1, 10 ** self.max_inputs_length)
+            inp_2 = random.randint(1, 10 ** self.max_inputs_length)
             target = inp_1 + inp_2
             inp_1_padded = [
                 int(i) for i in str(inp_1).zfill(self.max_inputs_length)]
@@ -42,18 +47,35 @@ class BaseNumbersDataSet(DataSet):
             inputs_concat.append(conc_inputs)
         if isinstance(self.delimiter, int):
             inputs_concat = np.asarray(inputs_concat, dtype='uint8')
+        if one_hot:
+            inputs_1 = nd_array_to_one_hot(inputs_1, n_classes)
+            inputs_2 = nd_array_to_one_hot(inputs_2, n_classes)
+            targets = nd_array_to_one_hot(targets, n_classes)
+            if isinstance(self.delimiter, int):
+                delimiter_ar = np.tile(np.array(
+                    self.delimiter, dtype='uint8'), (size, 1, n_classes))
+                inputs_concat = np.concatenate(
+                    (inputs_1, delimiter_ar, inputs_2), axis=1)
+            else:
+                delimiter_list = [self.delimiter] * n_classes
+                inputs_concat = [
+                    a.tolist() + [delimiter_list] + b.tolist() for a, b in zip(
+                        inputs_1, inputs_2)]
         return inputs_1, inputs_2, inputs_concat, targets
 
 
 class RandomNumbersSumDataSet(BaseNumbersDataSet):
-    def __init__(self, max_inputs_length, delimiter=0):
+    def __init__(self, max_inputs_length, delimiter=0, one_hot=False):
         """
         Args:
             max_inputs_length: `int`, max length of inputs.
             delimiter: any type. Delimiter for concatenated inputs.
+            one_hot: `bool`, default=False,
+                return inputs and labels one hot encoder or not
         """
         self.max_inputs_length = max_inputs_length
         self.delimiter = delimiter
+        self.one_hot = one_hot
 
     @property
     def num_examples(self):
@@ -61,25 +83,32 @@ class RandomNumbersSumDataSet(BaseNumbersDataSet):
 
     def next_batch(self, batch_size):
         """Return batch of required size"""
-        return self.random_data(batch_size)
+        return self.random_data(batch_size, self.one_hot)
 
 
 class SameNumbersSumDataSet(BaseNumbersDataSet):
     def __init__(self, max_inputs_length, dataset_size, shuffle=False,
-                 delimiter=0, dataset_all_data=None):
+                 delimiter=0, dataset_all_data=None, one_hot=False):
         """
         Args:
             max_inputs_length: `int`, max length of inputs.
-            dataset_size: `int`, 
+            dataset_size: `int`, qtty of entries in dataset.
+            shuffle: `bool`, default=False.
+                Should generated numbers be shuffled every epoch or not.
             delimiter: any type. Delimiter for concatenated inputs.
+            dataset_all_data: `tuple` of previously generated data
+            one_hot: `bool`, default=False,
+                return inputs and labels one hot encoder or not
         """
         self.max_inputs_length = max_inputs_length
         self.shuffle = shuffle
         self.dataset_size = dataset_size
         self.delimiter = delimiter
         self.dataset_all_data = dataset_all_data
+        self.one_hot = one_hot
         if self.dataset_all_data is None:
-            self.dataset_all_data = self.random_data(dataset_size)
+            self.dataset_all_data = self.random_data(
+                dataset_size, one_hot=one_hot)
         self.start_new_epoch()
 
     @property
@@ -158,7 +187,7 @@ class TwoNumbersConstDataProvider(TwoNumbersRandDataProvider):
     def __init__(self, max_inputs_length,
                  train_size, valid_size, test_size,
                  delimiter=0, shuffle=False, use_cache=False,
-                 cache_root_dir=None):
+                 cache_root_dir=None, one_hot=False):
         """
         Args:
             max_inputs_length: `int`, max length of inputs.
@@ -172,6 +201,8 @@ class TwoNumbersConstDataProvider(TwoNumbersRandDataProvider):
                 and use it for future runs with same settings.
             cache_root_dir: `str`, where cached data should be stored.
                 default to os based tmp dir.
+            one_hot: `bool`, default=False,
+                return inputs and labels one hot encoder or not
         """
         self.max_inputs_length = max_inputs_length
         self.train_size = train_size
@@ -179,6 +210,7 @@ class TwoNumbersConstDataProvider(TwoNumbersRandDataProvider):
         self.test_size = test_size
         self.delimiter = delimiter
         self.cache_root_dir = cache_root_dir
+        self.one_hot = one_hot
 
         if use_cache:
             prev_data, cache_was_loaded = self._get_prev_data_if_exist()
@@ -191,7 +223,8 @@ class TwoNumbersConstDataProvider(TwoNumbersRandDataProvider):
                 dataset_size=getattr(self, '%s_size' % d_name),
                 shuffle=shuffle,
                 delimiter=delimiter,
-                dataset_all_data=prev_data[d_name]
+                dataset_all_data=prev_data[d_name],
+                one_hot=one_hot,
             )
             setattr(self, d_name, dataset)
             if use_cache and not cache_was_loaded:
@@ -236,10 +269,11 @@ class TwoNumbersConstDataProvider(TwoNumbersRandDataProvider):
     def cache_pickle_path(self):
         f_name = (
             'max_inputs_length_{}_train_size_{}_valid_size_{}_'
-            'test_size_{}_delimiter_{}.pkl'.format(
+            'test_size_{}_delimiter_{}_one_hot_{}.pkl'.format(
                 self.max_inputs_length,
                 self.train_size,
                 self.valid_size,
                 self.test_size,
-                self.delimiter))
+                self.delimiter,
+                self.one_hot))
         return os.path.join(self.cache_dir_path, f_name)

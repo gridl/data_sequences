@@ -30,6 +30,33 @@ def test_BaseNumbersDataSet():
     assert len(res[2][0]) == (max_inputs_length * 2 + 1)
 
 
+def test_BaseNumbersDataSet_one_hot():
+    max_inputs_length = 5
+    fetched_size = 4
+    dataset = atn.BaseNumbersDataSet()
+    dataset.delimiter = 0
+    n_classes = 10
+    dataset.max_inputs_length = max_inputs_length
+    res = dataset.random_data(fetched_size, one_hot=True)
+    assert all(isinstance(a, np.ndarray) for a in res)
+    assert res[0].shape == (fetched_size, max_inputs_length, n_classes)
+    assert res[1].shape == (fetched_size, max_inputs_length, n_classes)
+    assert res[2].shape == (fetched_size, max_inputs_length * 2 + 1, n_classes)
+    assert res[3].shape == (fetched_size, max_inputs_length + 1, n_classes)
+    # check that two numbers really summed
+    n_1 = int(''.join(str(i) for i in np.argmax(res[0][0], axis=1)))
+    n_2 = int(''.join(str(i) for i in np.argmax(res[1][0], axis=1)))
+    assert n_1 + n_2 == int(
+        ''.join(str(i) for i in np.argmax(res[3][0], axis=1)))
+    # check that all works with string delimiter
+    dataset.delimiter = 'some'
+    res = dataset.random_data(fetched_size, one_hot=True)
+    assert isinstance(res[2], list)
+    assert len(res[2]) == fetched_size
+    assert len(res[2][0]) == (max_inputs_length * 2 + 1)
+    assert len(res[2][0][0]) == n_classes
+
+
 def test_RandomNumbersSumDataSet():
     max_inputs_length = 5
     batch_size = 10
@@ -69,7 +96,7 @@ def test_SameNumbersSumDataSet_not_shuffled():
     for i in range(dataset.num_examples // batch_size):
         res = dataset.next_batch(batch_size)
         if first_batch_first_epoch is None:
-            first_batch_first_epoch = res 
+            first_batch_first_epoch = res
         assert dataset._batch_counter == i + 1
     # new epoch begins, batch counter should be renewed
     first_batch_second_epoch = dataset.next_batch(batch_size)
