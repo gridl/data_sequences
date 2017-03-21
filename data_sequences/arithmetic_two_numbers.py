@@ -26,10 +26,11 @@ class BaseNumbersDataSet(DataSet):
             targets: 2D numpy array, shape (size, max_inputs_length + 1)
         """
         n_classes = 10
-        inputs_1 = np.zeros((size, self.max_inputs_length), dtype='uint8')
-        inputs_2 = np.zeros((size, self.max_inputs_length), dtype='uint8')
+        dtype = 'int8'
+        inputs_1 = np.zeros((size, self.max_inputs_length), dtype=dtype)
+        inputs_2 = np.zeros((size, self.max_inputs_length), dtype=dtype)
         inputs_concat = []
-        targets = np.zeros((size, self.max_inputs_length + 1), dtype='uint8')
+        targets = np.zeros((size, self.max_inputs_length + 1), dtype=dtype)
         for i in range(size):
             inp_1 = random.randint(1, 10 ** self.max_inputs_length)
             inp_2 = random.randint(1, 10 ** self.max_inputs_length)
@@ -41,19 +42,19 @@ class BaseNumbersDataSet(DataSet):
             target_padded = [
                 int(i) for i in str(target).zfill(self.max_inputs_length + 1)]
             conc_inputs = inp_1_padded + [self.delimiter] + inp_2_padded
-            inputs_1[i] = np.asarray(inp_1_padded, dtype='uint8')
-            inputs_2[i] = np.asarray(inp_2_padded, dtype='uint8')
-            targets[i] = np.asarray(target_padded, dtype='uint8')
+            inputs_1[i] = np.asarray(inp_1_padded, dtype=dtype)
+            inputs_2[i] = np.asarray(inp_2_padded, dtype=dtype)
+            targets[i] = np.asarray(target_padded, dtype=dtype)
             inputs_concat.append(conc_inputs)
         if isinstance(self.delimiter, int):
-            inputs_concat = np.asarray(inputs_concat, dtype='uint8')
+            inputs_concat = np.asarray(inputs_concat, dtype=dtype)
         if one_hot:
             inputs_1 = nd_array_to_one_hot(inputs_1, n_classes)
             inputs_2 = nd_array_to_one_hot(inputs_2, n_classes)
             targets = nd_array_to_one_hot(targets, n_classes)
             if isinstance(self.delimiter, int):
                 delimiter_ar = np.tile(np.array(
-                    self.delimiter, dtype='uint8'), (size, 1, n_classes))
+                    self.delimiter, dtype=dtype), (size, 1, n_classes))
                 inputs_concat = np.concatenate(
                     (inputs_1, delimiter_ar, inputs_2), axis=1)
             else:
